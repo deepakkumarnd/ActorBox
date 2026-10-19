@@ -32,7 +32,7 @@ mailbox.enqueue(stop)
 check("accepts control messages", mailbox.dequeue.equal?(stop))
 
 mailbox = MailBox.new
-MailBox::MAX_SIZE.times { |i| mailbox.enqueue(i) }
+MailBox::DEFAULT_MAX_SIZE.times { |i| mailbox.enqueue(i) }
 result = mailbox.enqueue(:overflow) # warns on stderr
 check("rejects messages once full",
       result == Actor::ControlMessage::REJECTED && mailbox.length == MailBox::MAX_SIZE)

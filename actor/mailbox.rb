@@ -6,22 +6,26 @@ require_relative 'control_message'
 
 module Actor
   class MailBox
-    MAX_SIZE = 100
+    attr_reader :queue, :max_size
 
-    attr_reader :queue
-
-    def initialize
-      @queue = Queue.new
+    def initialize(max_size = nil)
+      @max_size = max_size
+      # queue is unbounded by default
+      @queue = @max_size ? SizedQueue.new(@max_size) : Queue.new
     end
 
     def enqueue(item)
-      unless queue.size < MAX_SIZE
+      # unbounded queue
+      if max_size.nil?
+        queue.push(item)
+        ControlMessage::OK
+      # Reject if queue is full with zero timeout
+      elsif (queue.size < max_size) && queue.push(item, timeout: 0)
+        ControlMessage::OK 
+      else
         warn('Message rejected queue full')
-        return ControlMessage::REJECTED
+        ControlMessage::REJECTED
       end
-
-      @queue.push(item)
-      ControlMessage::OK
     end
 
     def dequeue

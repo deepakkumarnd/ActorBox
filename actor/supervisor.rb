@@ -2,12 +2,12 @@ require_relative 'actor'
 
 module Actor
   class Supervisor < Actor
-    def initialize(name: 'actor', concurrency: 1, &block)
-      @name = name
+    # mailbox size is for the concurrent actors not for supervisor
+    def initialize(name: 'actor', concurrency: 1, mailbox_size: nil, &block)
       @concurrency = concurrency
-      @actors = concurrency.times.map { Actor.new(name:, &block) }
+      @actors = concurrency.times.map { Actor.new(name:, mailbox_size:, &block) }
       @round_robin = @actors.cycle
-      super(name: "#{@name}-supervisor")
+      super(name: "#{name}-supervisor")
     end
 
     def concurrency
@@ -20,7 +20,21 @@ module Actor
     end
 
     def sleepmilli(milliseconds)
+      log("Sleeping #{milliseconds/1000.0} seconds")
+      @state = WAITING
       sleep(milliseconds/1000.0)
+      @state = RUNNING
+    end
+
+    def stats
+      {
+        name: name,
+        address: address,
+        state: state,
+        message_count: @mailbox.length,
+        concurrency: concurrency,
+        actors: @actors.map(&:stats)
+      }
     end
 
     private def run
@@ -31,39 +45,67 @@ module Actor
 
         loop do
           message = get_message
-          
-          log("Supervise #{message}")
+          log("processing #{message}")
 
           if stop_message? message
+            p "Stop message received"
             stop_all
             break
           else
-            # forward message to actors in a round robin fashion
-            # with exponential backoff
-            attempt = 1
-            done = next_actor.send_message(message)
-            exponent = 0
-
-            while done != ControlMessage::OK
-              log('Waiting for free mailbox')
-              sleepmilli(50 + (2**exponent))
-              attempt += 1
-              done = next_actor.send_message(message)
-              exponent = attempt % concurrency
-            end
+            forward_message(message)
           end
         end
-
+        p "Sueprvisor here, stopping itself #{@state}"
         stop_hooks
       end
     end
 
-    private def next_actor
-      @round_robin.next
+    private def forward_message(message)
+      # forward message to actors in a round robin fashion
+      # with exponential backoff if actor mailboxes reject
+      # message
+      attempt = 0
+      exponent = 0
+      cycle_count = 0
+      active_actor_count = @actors.filter { !it.stopped? }.length
+
+      loop do
+        actor = next_actor
+        
+        if actor.stopped?
+          active_actor_count -= 1
+          active_actor_count > 0 ? next : break
+        end
+
+        status = next_actor.send_message(message)
+        break if status == ControlMessage::OK
+
+        attempt += 1
+        exponent = attempt % active_actor_count
+        
+        # Wait after checking with all actors once
+        if exponent > cycle_count
+          log("None of the actors accept the message, waiting a bit for actors to finish")
+          sleepmilli(100 * (2** attempt))
+          cycle_count = exponent
+        end
+      end
     end
 
-    private def broadcast(message)
-      @actors.each { it.send_message(message) }
+    private def broadcast(message, attempts = 0)
+      sleepmilli(100 * (2** attempts)) if attempts > 0
+
+      success = @actors
+        .filter { !it.stopped? }
+        .map { it.send_message(message) }
+        .all? { it == ControlMessage::OK }
+
+      # recursively try till all the actors accepts the broadcast
+      broadcast(message, attempts + 1) if !success
+    end
+
+    private def next_actor
+      @round_robin.next
     end
 
     private def await_for_all

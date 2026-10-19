@@ -4,13 +4,14 @@ module Actor
   class Actor
     READY = :ready
     RUNNING = :running
+    WAITING = :waiting
     STOPPED = :stopped
 
-    def initialize(name: 'actor', &block)
+    def initialize(name: 'actor', mailbox_size: nil, &block)
       @name = name
-      @mailbox = MailBox.new
+      @mailbox = MailBox.new(mailbox_size)
       @block = block
-      @state = :ready
+      @state = READY
     end
 
     def name
@@ -18,12 +19,29 @@ module Actor
     end
 
     def send_message(message)
-      raise StandardError.new("Can't send message to a stopped actor") if stopped?
+      if stopped?
+        log("Can't send messages to stopped actor")
+        return ControlMessage::REJECTED 
+      end
+
       @mailbox.enqueue(message)
     end
 
     def address
       object_id
+    end
+
+    def state
+      @state
+    end
+
+    def stats
+      {
+        name: name,
+        address: address,
+        state: state,
+        message_count: @mailbox.length
+      }
     end
 
     def start
@@ -70,7 +88,10 @@ module Actor
     end
 
     private def get_message
-      @mailbox.dequeue
+      @state = WAITING
+      message = @mailbox.dequeue
+      @state = RUNNING
+      message
     end
 
     private def stop_message?(message)
