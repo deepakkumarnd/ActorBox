@@ -1,87 +1,204 @@
 # Actors
 
-An actor model framework written in Ruby and compiled to a native binary with
-[Spinel](../spinel/source_code), an ahead-of-time Ruby compiler.
+A small actor model library written in Ruby and compiled to a native binary
+with [Spinel](../spinel/source_code), an ahead-of-time Ruby compiler.
 
-Each actor owns a mailbox and processes its messages one at a time on its own
-thread. A supervisor runs a pool of actors and hands incoming messages to them
-in round-robin order.
+Each actor owns a bounded mailbox and handles its messages one at a time on its
+own thread. A supervisor runs a pool of actors and hands messages to them in
+round-robin order.
 
-## Components
-
-| File | What it does |
-| --- | --- |
-| [mailbox.rb](mailbox.rb) | `MailBox`: a bounded queue (`MAX_SIZE = 100`) of messages for one actor. `ControlMessage` and `StopActor`: messages that control an actor instead of carrying work. |
-| [actor.rb](actor.rb) | `Actor`: runs a block for each message in its mailbox on a dedicated thread, and stops when it receives `StopActor`. |
-| [supervisor.rb](supervisor.rb) | `Supervisor`: an actor that starts `concurrency` child actors and forwards each message it receives to the next child in round-robin order. |
-| [main.rb](main.rb) | Example program that uses a single actor and a supervisor. |
-
-### Mailbox
-
-- `enqueue(message)` returns `:ok`, or `:rejected` when the mailbox already
-  holds `MAX_SIZE` messages.
-- `dequeue` blocks until a message is available.
-
-### Actor
-
-An actor moves through three states: `:ready` → `:running` → `:stopped`.
+## Quick start
 
 ```ruby
-require_relative 'actor'
+require "actor"
 
-actor = Actor.new(name: 'printer') do |message|
+printer = Actor::Actor.new(name: 'printer') do |message|
   puts "Got #{message}"
 end
 
-actor.start                         # spawn the actor's thread
-actor.send_message('hello')         # => :ok, or :rejected if the mailbox is full
-actor.send_message(StopActor.new)   # finish queued messages, then stop
-actor.await                         # wait for the thread to exit
+printer.start
+printer.send_message('hello')                      # => :ok
+printer.send_message(Actor::ControlMessage::STOP)  # finish queued work, then stop
+printer.await                                      # wait for the thread to exit
 ```
 
-Sending a message to a stopped actor raises an error.
+## Setup
 
-### Supervisor
+`bin/` is gitignored. After cloning, link the Spinel tools into it (this
+assumes Spinel is checked out at `../spinel/source_code`):
+
+```sh
+mkdir -p bin
+ln -s ../../spinel/source_code/bin/spin bin/spin
+ln -s ../../spinel/source_code/spinel   bin/spinel
+```
+
+## Project layout
+
+This is a [spin](../spinel/source_code/docs/spin.md) library package. Spin
+resolves `require "actor"` to `actor.rb` and `require "actor/<name>"` to
+`actor/<name>.rb`, so there is no `lib/` directory.
+
+```
+actors/
+├── spin.toml               # package manifest
+├── actor.rb                # entry point: loads Actor and Supervisor
+├── actor/
+│   ├── actor.rb            # Actor::Actor
+│   ├── control_message.rb  # Actor::ControlMessage
+│   ├── mailbox.rb          # Actor::MailBox
+│   └── supervisor.rb       # Actor::Supervisor
+├── programs/
+│   ├── fib.rb              # fib(n), used by main.rb
+│   └── cycle.rb            # repro for a Spinel Enumerator#next bug
+├── main.rb                 # example program
+└── test/                   # one standalone test program per file
+```
+
+## API
+
+Everything lives under the `Actor` module.
+
+### `Actor::ControlMessage`
+
+Symbols that control an actor's life cycle instead of carrying work:
+
+| Constant | Value | Meaning |
+| --- | --- | --- |
+| `STOP` | `:stop` | Tells an actor to stop once it reaches this message |
+| `OK` | `:ok` | `send_message` / `enqueue` accepted the message |
+| `REJECTED` | `:rejected` | The mailbox was full, so the message was dropped |
+
+### `Actor::MailBox`
+
+A FIFO queue holding at most `MailBox::MAX_SIZE` (100) messages.
+
+- `enqueue(message)` returns `:ok`, or `:rejected` (and warns on stderr) when
+  the mailbox is full. It never blocks.
+- `dequeue` blocks until a message is available.
+- `empty?`, `length` (aliased as `size` and `count`).
+
+### `Actor::Actor`
+
+- `Actor::Actor.new(name: 'actor') { |message| ... }` creates an actor in the
+  `:ready` state. The block runs once per message.
+- `start` spawns the actor's thread (state becomes `:running`).
+- `send_message(message)` puts a message in the mailbox and returns `:ok` or
+  `:rejected`. It raises if the actor has stopped.
+- `await` joins the actor's thread.
+- `stopped?`, `name`, `address` (the actor's `object_id`).
+
+When the actor dequeues `ControlMessage::STOP`, it exits its loop and its state
+becomes `:stopped`. Messages queued before `STOP` are processed first.
+
+### `Actor::Supervisor`
+
+A subclass of `Actor::Actor` that runs a pool of child actors, all using the
+same block:
 
 ```ruby
-require_relative 'supervisor'
-
-pool = Supervisor.new(name: 'fib', concurrency: 10) do |message|
-  fibonacci(message)
+pool = Actor::Supervisor.new(name: 'squares', concurrency: 10) do |message|
+  puts message * message
 end
 
-pool.start
-100.times { |i| pool.send_message(i) }
-pool.send_message(StopActor.new)
+pool.start                                       # starts all children
+50.times { |i| pool.send_message(i) }
+pool.send_message(Actor::ControlMessage::STOP)
 pool.await
 ```
 
-Scheduling is round-robin: the supervisor cycles through its child actors and
-gives each new message to the next one. If that child's mailbox is full, the
-supervisor sleeps with a short backoff and tries the next child, until one
-accepts the message.
+- Each message goes to the next child in round-robin order. If that child's
+  mailbox is full, the supervisor sleeps briefly (50ms plus a small backoff)
+  and tries the next child until one accepts.
+- On `ControlMessage::STOP`, the supervisor sends `STOP` to every child, waits
+  for all of them to finish, cleans them up, and stops itself.
+- The supervisor's own mailbox is bounded too, so `send_message` returns
+  `:rejected` instead of waiting when you send more than 100 messages in a
+  burst. Check the return value and retry. A rejected `STOP` means the
+  supervisor never stops and `await` hangs.
+- With several children, output order depends on thread scheduling.
 
-When the supervisor receives `StopActor`, it sends `StopActor` to every child,
-waits for all of them to finish, cleans them up, and then stops itself.
+## Using the library from another project
 
-## Running
-
-With the standard Ruby interpreter (Ruby 3.4+, because the code uses the `it`
-block parameter):
+Add it as a path dependency:
 
 ```sh
-ruby main.rb
+cd ../myapp
+../actors/bin/spin add actor --path ../actors
 ```
 
-Compiled to a native binary with Spinel:
+Then `require "actor"`. Scripts inside this repo, like [main.rb](main.rb), use
+`require_relative 'actor'`.
+
+## Running the example
 
 ```sh
-./spinel main.rb          # produces ./main
+bin/spinel main.rb    # compiles to ./main
 ./main
 ```
 
-`spinel` is a symlink to `../spinel/source_code/spinel`; run `./spinel --help`
-for its other options.
+`main.rb` ends with a bare `sleep`, so it never exits on its own. Stop it with
+Ctrl-C.
 
-Debug logging is controlled by the global `$debug_mode` in
-[actor.rb](actor.rb).
+### Debug logging
+
+Set `DEBUG_MODE=true` to log every message an actor processes:
+
+```sh
+DEBUG_MODE=true ./main
+```
+
+The flag is read at run time, so the same binary works with logging on or off.
+Set it per command rather than exporting it: log lines include object IDs,
+which change on every run and would break test snapshots.
+
+## Tests
+
+Each `test/*.rb` is a standalone program. `spin test` compiles it with this
+package's sources and checks it:
+
+- If `test/<name>.rb.expected` exists, stdout must match it.
+- Otherwise the test also runs under CRuby and the two outputs must match.
+- A non-zero exit fails the test.
+
+```sh
+bin/spin test                  # run all tests
+bin/spin test mailbox_test.rb  # run one test
+bin/spin test --regen          # refresh .expected snapshots
+```
+
+Build output goes to `build/`.
+
+### Writing a test
+
+Minitest isn't available under Spinel. Write checks that raise on failure and
+print a line on success:
+
+```ruby
+require "actor/mailbox"
+
+def check(name, ok)
+  raise "FAIL: #{name}" unless ok
+  puts "ok - #{name}"
+end
+
+mailbox = Actor::MailBox.new
+check("returns ok on enqueue", mailbox.enqueue("hello") == Actor::ControlMessage::OK)
+```
+
+Keep output identical between runs:
+
+- Don't print object IDs or `inspect` output that contains addresses.
+- Leave `DEBUG_MODE` unset.
+- With several actors, collect results, `await` the actors, then print the
+  results sorted.
+- Wait with `await`, not `sleep`.
+
+## Known issues
+
+- [programs/cycle.rb](programs/cycle.rb) reproduces a Spinel bug where calling
+  a user-defined method on the result of `Enumerator#next` raises
+  `NoMethodError` ([matz/spinel#9620](https://github.com/matz/spinel/issues/9620)).
+  The supervisor's round-robin uses the same `Array#cycle` + `next` pattern. It
+  works with the current Spinel build, but suspect this first if supervisor
+  scheduling breaks after a compiler update.
