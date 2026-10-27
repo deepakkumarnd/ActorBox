@@ -3,8 +3,11 @@
 
 module Stage
   module ControlMessage
-    OK = :ok
-    REJECTED = :rejected
-    STOP = :stop
+    CType = Data.define(:message)
+
+    # Define control messages as objects
+    OK = CType[:ok]
+    REJECTED = CType[:rejected]
+    STOP = CType[:stop]
   end
 end

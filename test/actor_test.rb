@@ -1,3 +1,6 @@
+require 'securerandom'
+require 'socket'
+
 require 'stage/actor'
 
 Actor = Stage::Actor
@@ -17,7 +20,7 @@ actor = Actor.new(name: 'printer') {}
 check("creates a new actor with a name", actor.name == 'printer-actor')
 
 actor = Actor.new(name: 'printer-actor') {}
-check("creates a new actor with suffix '-actor'", actor.name == 'printer-actor')
+check("creates a new actor with name suffix '-actor'", actor.name == 'printer-actor')
 
 actor = Actor.new() {}
 check("creates a new actor with an initial READY state", actor.state == Actor::READY)
@@ -29,4 +32,27 @@ stats = {
   state: Actor::READY,
   message_count: 0
 }
-check("returns the stats as a hash", actor.stats == stats)
+check("#stats returns the statistics as a hash", actor.stats == stats)
+
+actor = Actor.new(name: 'printer') {}
+check("#ref returns the actor object reference", actor.ref == actor)
+
+actor = Actor.new(name: 'printer') {}
+check("#ref returns the actor object reference", actor.ref == actor)
+
+actor = Actor.new(name: 'printer') {}
+check("actor address is the object id by default", actor.address == actor.object_id)
+
+actor = Actor.new(name: 'printer') {}
+address = Stage::Address.new(1, SecureRandom.hex(4), Socket.gethostname)
+actor.set_address!(address)
+check("#set_address! set actor address within the actor system", actor.address == address)
+
+actor = Actor.new(name: 'printer') {}
+3.times { actor.send_message('Hello') }
+check("#send_message send a new message to the actor mailbox", actor.stats[:message_count] == 3)
+
+actor = Actor.new(name: 'printer') { }
+actor.start
+sleep 0.1
+check("#start will start the actor thread", actor.state == Actor::WAITING)

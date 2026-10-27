@@ -1,4 +1,5 @@
 require_relative 'mailbox'
+require_relative 'address'
 
 module Stage
   class Actor
@@ -23,17 +24,13 @@ module Stage
       @name
     end
 
+    # used by SystemActor to set the address
+    #: (Address) -> void
     def set_address!(address)
       @address = address
     end
 
-    private def set_name(name)
-      # name set from Supervisor class
-      return if @name
-      name = "#{address}" if name.nil? || name.empty?
-      @name = name.end_with?('-actor') ? name : "#{name}-actor"
-    end
-
+    #: (untyped) -> Stage::ControlMessage::CType
     def send_message(message)
       if stopped?
         log("Can't send messages to stopped actor")
@@ -43,6 +40,7 @@ module Stage
       @mailbox.enqueue(message)
     end
 
+    #: () -> (Address | Integer)
     def address
       @address || object_id
     end
@@ -64,6 +62,31 @@ module Stage
       # pass the @block to use high performance yield instead of @block.yield
       @thread = run(&@block)
       @thread.name = name
+    end
+
+    def log(text)
+      puts "#{name} #{address} -> #{text}" if $debug_mode
+    end
+
+    def await
+      @thread.join
+    end
+
+    def stopped?
+      @state == STOPPED
+    end
+
+    def cleanup
+      @mailbox = []
+      @thread = nil
+      @state = STOPPED
+    end
+
+    private def set_name(name)
+      # name set from Supervisor class
+      return if @name
+      name = "#{address}" if name.nil? || name.empty?
+      @name = name.end_with?('-actor') ? name : "#{name}-actor"
     end
 
     private def start_hooks
@@ -93,18 +116,6 @@ module Stage
       end
     end
 
-    def log(text)
-      puts "#{name} #{address} -> #{text}" if $debug_mode
-    end
-
-    def await
-      @thread.join
-    end
-
-    def stopped?
-      @state == STOPPED
-    end
-
     private def get_message
       @state = WAITING
       message = @mailbox.dequeue
@@ -114,12 +125,6 @@ module Stage
 
     private def stop_message?(message)
       message == ControlMessage::STOP
-    end
-
-    def cleanup
-      @mailbox = []
-      @thread = nil
-      @state = STOPPED
     end
   end
 end

@@ -11,7 +11,7 @@ mailbox = MailBox.new
 check("is empty by default", mailbox.empty? && mailbox.length == 0)
 
 mailbox = MailBox.new
-check("returns ok on enqueue", mailbox.enqueue("hello") == Actor::ControlMessage::OK)
+check("returns ok on enqueue", mailbox.enqueue("hello") == Stage::ControlMessage::OK)
 
 mailbox = MailBox.new
 3.times { |i| mailbox.enqueue(i) }
@@ -27,7 +27,7 @@ check("dequeues messages in FIFO order",
       first == :first && second == :second && mailbox.empty?)
 
 mailbox = MailBox.new
-stop = Actor::ControlMessage::STOP
+stop = Stage::ControlMessage::STOP
 mailbox.enqueue(stop)
 check("accepts control messages", mailbox.dequeue.equal?(stop))
 
@@ -36,7 +36,7 @@ mailbox = MailBox.new(max_size: max_length)
 max_length.times { |i| mailbox.enqueue(i) }
 result = mailbox.enqueue(:overflow) # warns on stderr
 check("rejects messages once full",
-      result == Actor::ControlMessage::REJECTED && mailbox.length == max_length)
+      result == Stage::ControlMessage::REJECTED && mailbox.length == max_length)
 
 mailbox = MailBox.new
 reader = Thread.new { mailbox.dequeue }

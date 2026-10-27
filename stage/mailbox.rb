@@ -15,6 +15,7 @@ module Stage
       @queue = @max_size ? SizedQueue.new(@max_size) : Queue.new
     end
 
+    #: (untyped) -> Stage::ControlMessage::CType
     def enqueue(item)
       # unbounded queue
       if unbounded?

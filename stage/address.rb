@@ -1,11 +1,12 @@
 module Stage
-  module ActorAddress
-    Address = Data.define(:actor_id, :system_id, :hostname) do
-      def to_s
-        "#{actor_id}@#{system_id}.#{hostname}"
-      end
+  
+  Address = Data.define(:actor_id, :system_id, :hostname) do
+    def to_s
+      "#{actor_id}@#{system_id}.#{hostname}"
     end
+  end
 
+  module ActorAddress
     class InvalidAddressError < StandardError; end
 
     ADDRESS_PATTERN = /\A[1-9][0-9]*@[0-9a-f]{8}(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+\z/.freeze

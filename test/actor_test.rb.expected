@@ -1,2 +1,12 @@
 ok - creates a new actor
+ok - creates a new actor with optional block
 ok - creates a new actor with a name
+ok - creates a new actor with name suffix '-actor'
+ok - creates a new actor with an initial READY state
+ok - #stats returns the statistics as a hash
+ok - #ref returns the actor object reference
+ok - #ref returns the actor object reference
+ok - actor address is the object id by default
+ok - #set_address! set actor address within the actor system
+ok - #send_message send a new message to the actor mailbox
+ok - #start will start the actor thread
