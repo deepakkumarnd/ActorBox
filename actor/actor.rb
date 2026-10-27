@@ -7,15 +7,30 @@ module Actor
     WAITING = :waiting
     STOPPED = :stopped
 
-    def initialize(name: 'actor', mailbox_size: nil, &block)
-      @name = name
+    def initialize(name: nil, mailbox_size: nil, &block)
+      @name = actor_name(name)
       @mailbox = MailBox.new(mailbox_size)
       @block = block
       @state = READY
     end
 
+    def ref
+      self
+    end
+
     def name
       @name
+    end
+
+    private def actor_name(name)
+      name = "#{address}" if name.nil? || name.empty?
+
+      @name = 
+        if is_a?(Supervisor)
+          name.end_with?('-supervisor') ? name : "#{name}-supervisor"
+        else
+          name.end_with?('-actor') ? name : "#{name}-actor"
+        end
     end
 
     def send_message(message)
@@ -51,10 +66,12 @@ module Actor
     end
 
     private def start_hooks
+      log('Running start hooks')
       @state = RUNNING
     end
 
     private def stop_hooks
+      log('Running stop hooks')
       @state = STOPPED
     end
 
@@ -68,7 +85,7 @@ module Actor
           log "Processing Message #{message}"
           break if stop_message?(message)
 
-          yield(message) if block_given?
+          yield(message, ref) if block_given?
         end
 
         stop_hooks

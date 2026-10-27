@@ -3,11 +3,11 @@ require_relative 'actor'
 module Actor
   class Supervisor < Actor
     # mailbox size is for the concurrent actors not for supervisor
-    def initialize(name: 'actor', concurrency: 1, mailbox_size: nil, &block)
+    def initialize(name: nil, concurrency: 1, mailbox_size: nil, &block)
       @concurrency = concurrency
       @actors = concurrency.times.map { Actor.new(name:, mailbox_size:, &block) }
       @round_robin = @actors.cycle
-      super(name: "#{name}-supervisor")
+      super(name:)
     end
 
     def concurrency
@@ -48,14 +48,14 @@ module Actor
           log("processing #{message}")
 
           if stop_message? message
-            p "Stop message received"
+            log("Stop message received")
             stop_all
             break
           else
             forward_message(message)
           end
         end
-        p "Sueprvisor here, stopping itself #{@state}"
+
         stop_hooks
       end
     end
@@ -113,6 +113,7 @@ module Actor
     end
 
     private def start_all
+      log('Starting all actors')
       @actors.each(&:start)
     end
 
