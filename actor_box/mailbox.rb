@@ -4,7 +4,7 @@ require_relative 'control_message'
 # actor processes each messages one by one at a time.
 # a Message in mailbox contains sender address and receiver address.
 
-module Stage
+module ActorBox
   class MailBox
     attr_reader :queue, :max_size
 
@@ -15,7 +15,7 @@ module Stage
       @queue = @max_size ? SizedQueue.new(@max_size) : Queue.new
     end
 
-    #: (untyped) -> Stage::ControlMessage::CType
+    #: (untyped) -> ActorBox::ControlMessage::CType
     def enqueue(item)
       # unbounded queue
       if unbounded?

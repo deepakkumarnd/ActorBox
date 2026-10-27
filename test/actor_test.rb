@@ -1,9 +1,9 @@
 require 'securerandom'
 require 'socket'
 
-require 'stage/actor'
+require 'actor_box/actor'
 
-Actor = Stage::Actor
+Actor = ActorBox::Actor
 
 def check(name, ok)
   raise "FAIL: #{name}" unless ok
@@ -44,7 +44,7 @@ actor = Actor.new(name: 'printer') {}
 check("actor address is the object id by default", actor.address == actor.object_id)
 
 actor = Actor.new(name: 'printer') {}
-address = Stage::Address.new(1, SecureRandom.hex(4), Socket.gethostname)
+address = ActorBox::Address.new(1, SecureRandom.hex(4), Socket.gethostname)
 actor.set_address!(address)
 check("#set_address! set actor address within the actor system", actor.address == address)
 

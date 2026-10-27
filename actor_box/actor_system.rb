@@ -3,7 +3,7 @@ require_relative 'address'
 require 'socket'
 require 'securerandom'
 
-module Stage
+module ActorBox
   Data.define
   # ActorSystem is a special supervisor actor
   class ActorSystem

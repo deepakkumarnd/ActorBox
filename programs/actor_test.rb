@@ -1,4 +1,4 @@
-require_relative '../stage'
+require_relative '../actor_box'
 
 my_actor = SystemActor.actor do |message|
   p "Working on #{message}"

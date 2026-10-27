@@ -1,7 +1,7 @@
 require_relative 'mailbox'
 require_relative 'address'
 
-module Stage
+module ActorBox
   class Actor
     READY = :ready
     RUNNING = :running
@@ -30,7 +30,7 @@ module Stage
       @address = address
     end
 
-    #: (untyped) -> Stage::ControlMessage::CType
+    #: (untyped) -> ActorBox::ControlMessage::CType
     def send_message(message)
       if stopped?
         log("Can't send messages to stopped actor")

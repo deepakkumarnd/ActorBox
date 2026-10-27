@@ -1,6 +1,6 @@
 require_relative 'actor'
 
-module Stage
+module ActorBox
   class Supervisor < Actor
     # mailbox size is for the concurrent actors not for supervisor
     def initialize(name: nil, concurrency: 1, mailbox_size: nil, system: nil, &block)

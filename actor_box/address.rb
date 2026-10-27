@@ -1,4 +1,4 @@
-module Stage
+module ActorBox
   
   Address = Data.define(:actor_id, :system_id, :hostname) do
     def to_s

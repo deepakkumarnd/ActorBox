@@ -1,6 +1,6 @@
-# Stage
+# ActorBox
 
-> Stage is where the actors perform.
+> ActorBox is where the actors live.
 
 A small actor model library written in Ruby and compiled to a native binary
 with [Spinel](https://github.com/matz/spinel), an ahead-of-time Ruby compiler.
@@ -17,7 +17,7 @@ actor for you, registers it under an address, and lets you stop everything in
 one call.
 
 ```ruby
-require "stage"
+require "actor_box"
 
 printer = SystemActor.actor(name: 'printer') do |message|
   puts "Got #{message}"
@@ -32,18 +32,18 @@ talk to the actor by sending messages to that address.
 
 ## Concepts
 
-Everything lives under the `Stage` module, except `SystemActor`, which is a
+Everything lives under the `ActorBox` module, except `SystemActor`, which is a
 top-level constant.
 
 | Entity | What it is |
 | --- | --- |
-| [`Stage::Actor`](#actor) | Handles messages one at a time on its own thread |
-| [`Stage::Supervisor`](#supervisor) | An actor that spreads messages over a pool of child actors |
-| [`Stage::ActorSystem`](#actorsystem) | A registry that creates, starts, finds and stops actors by address |
-| [`Stage::ActorAddress`](#actoraddress) | The address an actor gets when it joins an actor system |
-| [`Stage::MailBox`](#mailbox) | The FIFO queue in front of every actor |
-| [`SystemActor`](#systemactor) | The global `ActorSystem` created when you `require "stage"` |
-| [`Stage::ControlMessage`](#controlmessage) | Symbols that control an actor or report whether a message was accepted |
+| [`ActorBox::Actor`](#actor) | Handles messages one at a time on its own thread |
+| [`ActorBox::Supervisor`](#supervisor) | An actor that spreads messages over a pool of child actors |
+| [`ActorBox::ActorSystem`](#actorsystem) | A registry that creates, starts, finds and stops actors by address |
+| [`ActorBox::ActorAddress`](#actoraddress) | The address an actor gets when it joins an actor system |
+| [`ActorBox::MailBox`](#mailbox) | The FIFO queue in front of every actor |
+| [`SystemActor`](#systemactor) | The global `ActorSystem` created when you `require "actor_box"` |
+| [`ActorBox::ControlMessage`](#controlmessage) | Symbols that control an actor or report whether a message was accepted |
 
 ### Actor
 
@@ -63,7 +63,7 @@ The recommended way to create one is through `SystemActor`, which starts it
 and gives it an address:
 
 ```ruby
-require "stage"
+require "actor_box"
 
 counter = SystemActor.actor(name: 'counter') do |message, actor|
   puts "#{actor.name} handling #{message}"
@@ -78,16 +78,16 @@ yourself, keep the object around, and send it `STOP` and `await` it when you
 are done:
 
 ```ruby
-require "stage"
+require "actor_box"
 
-printer = Stage::Actor.new(name: 'printer') do |message|
+printer = ActorBox::Actor.new(name: 'printer') do |message|
   puts "Got #{message}"
 end
 
 printer.state                                      # => :ready
 printer.start
 printer.send_message('hello')                      # => :ok
-printer.send_message(Stage::ControlMessage::STOP)  # finish queued work, then stop
+printer.send_message(ActorBox::ControlMessage::STOP)  # finish queued work, then stop
 printer.await                                      # wait for the thread to exit
 printer.stopped?                                   # => true
 printer.send_message('too late')                   # => :rejected
@@ -97,13 +97,13 @@ Pass `mailbox_size:` to bound the mailbox. A full mailbox rejects messages
 instead of blocking the sender, so check the result:
 
 ```ruby
-slow = Stage::Actor.new(name: 'slow', mailbox_size: 2) do |message|
+slow = ActorBox::Actor.new(name: 'slow', mailbox_size: 2) do |message|
   sleep 1
 end
 slow.start
 
 5.times do |i|
-  if slow.send_message(i) == Stage::ControlMessage::REJECTED
+  if slow.send_message(i) == ActorBox::ControlMessage::REJECTED
     puts "dropped #{i}"
   end
 end
@@ -118,7 +118,7 @@ printer.stats
 
 Reference:
 
-- `Stage::Actor.new(name: nil, mailbox_size: nil) { |message, actor| ... }`
+- `ActorBox::Actor.new(name: nil, mailbox_size: nil) { |message, actor| ... }`
   creates an actor in the `:ready` state. `-actor` is appended to the name
   unless it already ends that way. The mailbox is unbounded unless you pass
   `mailbox_size`.
@@ -140,7 +140,7 @@ handled in parallel. Stopping a supervisor stops the whole pool.
 The recommended way to create one is through `SystemActor`:
 
 ```ruby
-require "stage"
+require "actor_box"
 
 squares = SystemActor.supervisor(name: 'squares', concurrency: 4) do |message|
   puts message * message
@@ -154,15 +154,15 @@ You can also build one by hand. Here each child has a mailbox of 2, so the
 supervisor has to wait when every child is busy:
 
 ```ruby
-require "stage"
+require "actor_box"
 
-pool = Stage::Supervisor.new(name: 'squares', concurrency: 10, mailbox_size: 2) do |message|
+pool = ActorBox::Supervisor.new(name: 'squares', concurrency: 10, mailbox_size: 2) do |message|
   puts message * message
 end
 
 pool.start                                       # starts all children
 50.times { |i| pool.send_message(i) }
-pool.send_message(Stage::ControlMessage::STOP)   # stops every child, then itself
+pool.send_message(ActorBox::ControlMessage::STOP)   # stops every child, then itself
 pool.await
 ```
 
@@ -180,7 +180,7 @@ reaches the children as well as the supervisor. When building a supervisor by
 hand, pass `system:` to get the same behaviour:
 
 ```ruby
-pool = Stage::Supervisor.new(name: 'workers', concurrency: 3, system: SystemActor) do |message|
+pool = ActorBox::Supervisor.new(name: 'workers', concurrency: 3, system: SystemActor) do |message|
   puts message
 end
 SystemActor.register_actor(pool)
@@ -189,7 +189,7 @@ pool.start
 
 Reference:
 
-- `Stage::Supervisor.new(name: nil, concurrency: 1, mailbox_size: nil, system: nil) { |message, actor| ... }`.
+- `ActorBox::Supervisor.new(name: nil, concurrency: 1, mailbox_size: nil, system: nil) { |message, actor| ... }`.
   `-supervisor` is appended to the name, and each child is named
   `<name>-actor`.
 - `mailbox_size:` sets the size of each child's mailbox. Children have
@@ -215,12 +215,12 @@ creating your own. `actor` and `supervisor` create, register and start an
 actor in one step and return its address:
 
 ```ruby
-require "stage"
+require "actor_box"
 
 logger = SystemActor.actor(name: 'logger') { |line| puts line }
 SystemActor.send_message(logger, 'booting')   # => :ok
 
-SystemActor.send_message(Stage::ActorAddress.build(1, 'deadbeef', 'nowhere'), 'hi')
+SystemActor.send_message(ActorBox::ActorAddress.build(1, 'deadbeef', 'nowhere'), 'hi')
 # warns "Actor not found for address ..." and returns nil
 ```
 
@@ -228,7 +228,7 @@ To use options that `actor` doesn't take, such as `mailbox_size:`, build the
 actor yourself and register it before starting it:
 
 ```ruby
-bounded = Stage::Actor.new(name: 'bounded', mailbox_size: 10) { |m| puts m }
+bounded = ActorBox::Actor.new(name: 'bounded', mailbox_size: 10) { |m| puts m }
 SystemActor.register_actor(bounded)
 bounded.start
 
@@ -276,7 +276,7 @@ and work as hash keys. You rarely build one yourself: keep the address that
 `SystemActor.actor` or `SystemActor.supervisor` returned and pass it around.
 
 ```ruby
-require "stage"
+require "actor_box"
 
 address = SystemActor.actor(name: 'echo') { |m| puts m }
 
@@ -290,9 +290,9 @@ address.to_s       # => "1234@9f2c41ab.build-box"
 `ActorAddress::InvalidAddressError` if it doesn't match:
 
 ```ruby
-Stage::ActorAddress.build(42, '9f2c41ab', 'build-box')   # => valid address
-Stage::ActorAddress.build(42, 'nothex!', 'build-box')    # raises InvalidAddressError
-Stage::ActorAddress.valid?(address)                      # => true
+ActorBox::ActorAddress.build(42, '9f2c41ab', 'build-box')   # => valid address
+ActorBox::ActorAddress.build(42, 'nothex!', 'build-box')    # raises InvalidAddressError
+ActorBox::ActorAddress.valid?(address)                      # => true
 ```
 
 `ActorAddress.from_s("1234@9f2c41ab.build-box")` parses a string back into an
@@ -310,16 +310,16 @@ pushes back on producers that outpace the actor. The actor's thread is the
 only reader and blocks on the mailbox while it is empty.
 
 You don't create mailboxes when you use actors: pass `mailbox_size:` to
-`Stage::Actor.new` or `Stage::Supervisor.new` instead. The class is useful on
+`ActorBox::Actor.new` or `ActorBox::Supervisor.new` instead. The class is useful on
 its own, or when testing:
 
 ```ruby
-require "stage/mailbox"
+require "actor_box/mailbox"
 
-unbounded = Stage::MailBox.new
+unbounded = ActorBox::MailBox.new
 unbounded.enqueue('a')   # => :ok, always
 
-bounded = Stage::MailBox.new(2)
+bounded = ActorBox::MailBox.new(2)
 bounded.enqueue('a')     # => :ok
 bounded.enqueue('b')     # => :ok
 bounded.enqueue('c')     # => :rejected, and warns on stderr
@@ -338,8 +338,8 @@ Reference:
 
 ### SystemActor
 
-`SystemActor` is a single `Stage::ActorSystem` created when you
-`require "stage"`, shared by the whole program. It is the safe default way
+`SystemActor` is a single `ActorBox::ActorSystem` created when you
+`require "actor_box"`, shared by the whole program. It is the safe default way
 to work with actors: every actor it creates is started, has an address, and
 is stopped by one `SystemActor.stop`, so none are left running when the
 program ends. Code anywhere in the program can reach an actor through its
@@ -349,7 +349,7 @@ A typical program creates its actors and supervisors up front, sends work,
 and stops the system at the end:
 
 ```ruby
-require "stage"
+require "actor_box"
 
 results = SystemActor.actor(name: 'results') do |line|
   puts line
@@ -373,7 +373,7 @@ stop producers first by hand, when that matters.
 A service that runs until it is told to stop uses `wait`:
 
 ```ruby
-require "stage"
+require "actor_box"
 
 SystemActor.supervisor(name: 'jobs', concurrency: 8) do |job|
   puts "processing #{job}"
@@ -382,7 +382,7 @@ end
 SystemActor.wait   # Ctrl-C or SIGTERM stops every actor, then returns
 ```
 
-`stage.rb` also registers an `at_exit` hook that prints `"Stopping actor
+`actor_box.rb` also registers an `at_exit` hook that prints `"Stopping actor
 system"`. It doesn't stop anything, so still call `stop` or `wait` yourself.
 
 ### ControlMessage
@@ -406,13 +406,13 @@ directly, because `SystemActor.stop` sends it to every registered actor. You
 can still stop one actor by address:
 
 ```ruby
-require "stage"
+require "actor_box"
 
 worker = SystemActor.actor(name: 'worker') { |job| puts "doing #{job}" }
 
 SystemActor.send_message(worker, 'job 1')
 SystemActor.send_message(worker, 'job 2')
-SystemActor.send_message(worker, Stage::ControlMessage::STOP)  # after job 2
+SystemActor.send_message(worker, ActorBox::ControlMessage::STOP)  # after job 2
 SystemActor.lookup_actor(worker).await
 SystemActor.send_message(worker, 'job 3')                      # => :rejected
 ```
@@ -424,12 +424,12 @@ Check the result of `send_message` when the mailbox is bounded or the actor
 may already have stopped:
 
 ```ruby
-actor = Stage::Actor.new(name: 'bounded', mailbox_size: 1) { |m| sleep 1 }
+actor = ActorBox::Actor.new(name: 'bounded', mailbox_size: 1) { |m| sleep 1 }
 actor.start
 
 case actor.send_message('work')
-when Stage::ControlMessage::OK       then puts 'queued'
-when Stage::ControlMessage::REJECTED then puts 'full or stopped, try later'
+when ActorBox::ControlMessage::OK       then puts 'queued'
+when ActorBox::ControlMessage::REJECTED then puts 'full or stopped, try later'
 end
 ```
 
@@ -454,20 +454,20 @@ ln -s ../../spinel/source_code/spinel   bin/spinel
 ## Project layout
 
 This is a [spin](../spinel/source_code/docs/spin.md) library package. Spin
-resolves `require "stage"` to `stage.rb` and `require "stage/<name>"` to
-`stage/<name>.rb`, so there is no `lib/` directory.
+resolves `require "actor_box"` to `actor_box.rb` and `require "actor_box/<name>"` to
+`actor_box/<name>.rb`, so there is no `lib/` directory.
 
 ```
 actors/
 ├── spin.toml               # package manifest
-├── stage.rb                # entry point: loads everything, defines SystemActor
-├── stage/
-│   ├── actor.rb            # Stage::Actor
-│   ├── actor_system.rb     # Stage::ActorSystem
-│   ├── address.rb          # Stage::ActorAddress
-│   ├── control_message.rb  # Stage::ControlMessage
-│   ├── mailbox.rb          # Stage::MailBox
-│   └── supervisor.rb       # Stage::Supervisor
+├── actor_box.rb            # entry point: loads everything, defines SystemActor
+├── actor_box/
+│   ├── actor.rb            # ActorBox::Actor
+│   ├── actor_system.rb     # ActorBox::ActorSystem
+│   ├── address.rb          # ActorBox::ActorAddress
+│   ├── control_message.rb  # ActorBox::ControlMessage
+│   ├── mailbox.rb          # ActorBox::MailBox
+│   └── supervisor.rb       # ActorBox::Supervisor
 ├── programs/
 │   ├── fib.rb              # fib(n), used by main.rb
 │   └── cycle.rb            # repro for a Spinel Enumerator#next bug
@@ -481,11 +481,11 @@ Add it as a path dependency:
 
 ```sh
 cd ../myapp
-../actors/bin/spin add stage --path ../actors
+../actors/bin/spin add actor_box --path ../actors
 ```
 
-Then `require "stage"`. Scripts inside this repo, like [main.rb](main.rb), use
-`require_relative 'stage'`.
+Then `require "actor_box"`. Scripts inside this repo, like [main.rb](main.rb), use
+`require_relative 'actor_box'`.
 
 ## Running the example
 
@@ -532,7 +532,7 @@ Build output goes to `build/`.
 
 ### With CRuby
 
-Add the repo root to the load path so `require "stage/..."` resolves the same
+Add the repo root to the load path so `require "actor_box/..."` resolves the same
 way it does under spin:
 
 ```sh
@@ -548,15 +548,15 @@ Minitest isn't available under Spinel. Write checks that raise on failure and
 print a line on success:
 
 ```ruby
-require "stage/mailbox"
+require "actor_box/mailbox"
 
 def check(name, ok)
   raise "FAIL: #{name}" unless ok
   puts "ok - #{name}"
 end
 
-mailbox = Stage::MailBox.new
-check("returns ok on enqueue", mailbox.enqueue("hello") == Stage::ControlMessage::OK)
+mailbox = ActorBox::MailBox.new
+check("returns ok on enqueue", mailbox.enqueue("hello") == ActorBox::ControlMessage::OK)
 ```
 
 Keep output identical between runs:
