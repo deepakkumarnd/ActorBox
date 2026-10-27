@@ -1,31 +1,44 @@
 require_relative 'supervisor'
-
+require_relative 'address'
+require 'socket'
+require 'securerandom'
 module Actor
+  Data.define
   # ActorSystem is a special supervisor actor
   class ActorSystem
     def initialize(name: nil)
       # a mapping of actor address to actor/supervisor
       @registry = {}
+      @hostname = get_hostname
+      @system_id = actor_system_id
+    end
+
+    private def get_hostname
+      Socket.gethostname
+    end
+
+    private def actor_system_id
+      SecureRandom.hex(4).to_s
     end
 
     def send_message(address, message)
-      $actor_system.lookup_actor(address)&.send_message(message)
+      SystemActor.lookup_actor(address)&.send_message(message)
     end
 
     # create an actor within actor system
     def actor(name: nil, &block)
-      instance = Actor.new(name:, &block)
-      $actor_system.register_actor(instance)
-      instance.start
-      instance.address
+      actor = Actor.new(name:, &block)
+      SystemActor.register_actor(actor)
+      actor.start
+      actor.address
     end
 
     # create a supervisor within actor system
     def supervisor(name: nil, concurrency: 1, &block)
-      instance = Supervisor.new(name:, concurrency:)
-      $actor_system.register_actor(instance)
-      instance.start
-      instance.address
+      supervisor = Supervisor.new(name:, concurrency:)
+      SystemActor.register_actor(supervisor)
+      supervisor.start
+      supervisor.address
     end
 
     def send_message(address, message)
@@ -43,6 +56,8 @@ module Actor
       if @registry.key?(actor.address)
         log("Already registered actor")
       else
+        address = ActorAddress.build(actor.object_id, @system_id, @hostname)
+        actor.set_address!(address)
         @registry[actor.address] = actor
       end
     end

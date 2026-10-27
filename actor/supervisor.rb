@@ -3,9 +3,13 @@ require_relative 'actor'
 module Actor
   class Supervisor < Actor
     # mailbox size is for the concurrent actors not for supervisor
-    def initialize(name: nil, concurrency: 1, mailbox_size: nil, &block)
+    def initialize(name: nil, concurrency: 1, mailbox_size: nil, system: nil, &block)
       @concurrency = concurrency
-      @actors = concurrency.times.map { Actor.new(name:, mailbox_size:, &block) }
+      @actors = concurrency.times.map do
+        actor = Actor.new(name:, mailbox_size:, &block) 
+        system.register_actor(actor) if system
+        actor
+      end
       @round_robin = @actors.cycle
       super(name:)
     end

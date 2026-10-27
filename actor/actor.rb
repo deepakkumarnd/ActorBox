@@ -12,6 +12,7 @@ module Actor
       @mailbox = MailBox.new(mailbox_size)
       @block = block
       @state = READY
+      @address = nil
     end
 
     def ref
@@ -20,6 +21,10 @@ module Actor
 
     def name
       @name
+    end
+
+    def set_address!(address)
+      @address = address
     end
 
     private def actor_name(name)
@@ -36,14 +41,14 @@ module Actor
     def send_message(message)
       if stopped?
         log("Can't send messages to stopped actor")
-        return ControlMessage::REJECTED 
+        return ControlMessage::REJECTED
       end
 
       @mailbox.enqueue(message)
     end
 
     def address
-      object_id
+      @address || object_id
     end
 
     def state

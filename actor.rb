@@ -5,7 +5,7 @@ require_relative 'actor/actor_system'
 $debug_mode = ENV['DEBUG_MODE'] == 'true'
 # singleton actor system initialized on load
 
-$actor_system = Actor::ActorSystem.new
+SystemActor = Actor::ActorSystem.new
 
 at_exit do
   p "Stopping actor system"
