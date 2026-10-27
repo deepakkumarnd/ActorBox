@@ -8,7 +8,8 @@ module Actor
   class MailBox
     attr_reader :queue, :max_size
 
-    def initialize(max_size = nil)
+    # @rbs (?max_size: Integer?) -> void
+    def initialize(max_size: nil)
       @max_size = max_size
       # queue is unbounded by default
       @queue = @max_size ? SizedQueue.new(@max_size) : Queue.new
@@ -16,7 +17,7 @@ module Actor
 
     def enqueue(item)
       # unbounded queue
-      if max_size.nil?
+      if unbounded?
         queue.push(item)
         ControlMessage::OK
       # Reject if queue is full with zero timeout
@@ -38,6 +39,10 @@ module Actor
 
     def length
       @queue.size
+    end
+
+    def unbounded?
+      @max_size.nil?
     end
 
     alias_method :count, :length

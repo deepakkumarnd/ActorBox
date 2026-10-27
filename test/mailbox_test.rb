@@ -1,4 +1,4 @@
-require "actor/mailbox"
+require 'actor/mailbox'
 
 MailBox = Actor::MailBox
 
@@ -31,11 +31,12 @@ stop = Actor::ControlMessage::STOP
 mailbox.enqueue(stop)
 check("accepts control messages", mailbox.dequeue.equal?(stop))
 
-mailbox = MailBox.new
-MailBox::DEFAULT_MAX_SIZE.times { |i| mailbox.enqueue(i) }
+max_length = 3
+mailbox = MailBox.new(max_size: max_length)
+max_length.times { |i| mailbox.enqueue(i) }
 result = mailbox.enqueue(:overflow) # warns on stderr
 check("rejects messages once full",
-      result == Actor::ControlMessage::REJECTED && mailbox.length == MailBox::MAX_SIZE)
+      result == Actor::ControlMessage::REJECTED && mailbox.length == max_length)
 
 mailbox = MailBox.new
 reader = Thread.new { mailbox.dequeue }

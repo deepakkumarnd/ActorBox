@@ -1,10 +1,8 @@
 Message rejected queue full
-/Users/deepak/Work/actors/test/mailbox_test.rb:38:in '<main>': uninitialized constant Actor::MailBox::MAX_SIZE (NameError)
-
-      result == Actor::ControlMessage::REJECTED && mailbox.length == MailBox::MAX_SIZE)
-                                                                            ^^^^^^^^^^
 ok - is empty by default
 ok - returns ok on enqueue
 ok - tracks the number of messages
 ok - dequeues messages in FIFO order
 ok - accepts control messages
+ok - rejects messages once full
+ok - blocks dequeue until a message arrives
