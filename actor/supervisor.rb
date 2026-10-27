@@ -11,7 +11,12 @@ module Actor
         actor
       end
       @round_robin = @actors.cycle
-      super(name:)
+      set_name(name)
+      super()
+    end
+
+    private def set_name(name)
+      @name = name.end_with?('-supervisor') ? name : "#{name}-supervisor"
     end
 
     def concurrency

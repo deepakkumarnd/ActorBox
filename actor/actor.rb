@@ -8,8 +8,8 @@ module Actor
     STOPPED = :stopped
 
     def initialize(name: nil, mailbox_size: nil, &block)
-      @name = actor_name(name)
-      @mailbox = MailBox.new(mailbox_size)
+      set_name(name)
+      @mailbox = MailBox.new(max_size: mailbox_size)
       @block = block
       @state = READY
       @address = nil
@@ -27,15 +27,11 @@ module Actor
       @address = address
     end
 
-    private def actor_name(name)
+    private def set_name(name)
+      # name set from Supervisor class
+      return if @name
       name = "#{address}" if name.nil? || name.empty?
-
-      @name = 
-        if is_a?(Supervisor)
-          name.end_with?('-supervisor') ? name : "#{name}-supervisor"
-        else
-          name.end_with?('-actor') ? name : "#{name}-actor"
-        end
+      @name = name.end_with?('-actor') ? name : "#{name}-actor"
     end
 
     def send_message(message)
