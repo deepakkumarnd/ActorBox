@@ -35,7 +35,7 @@ module Actor
 
     # create a supervisor within actor system
     def supervisor(name: nil, concurrency: 1, &block)
-      supervisor = Supervisor.new(name:, concurrency:)
+      supervisor = Supervisor.new(name:, concurrency:, system: self, &block)
       SystemActor.register_actor(supervisor)
       supervisor.start
       supervisor.address
