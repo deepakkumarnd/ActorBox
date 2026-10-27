@@ -4,7 +4,7 @@ require_relative 'control_message'
 # actor processes each messages one by one at a time.
 # a Message in mailbox contains sender address and receiver address.
 
-module Actor
+module Stage
   class MailBox
     attr_reader :queue, :max_size
 

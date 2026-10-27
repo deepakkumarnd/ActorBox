@@ -1,6 +1,6 @@
 require_relative 'mailbox'
 
-module Actor
+module Stage
   class Actor
     READY = :ready
     RUNNING = :running

@@ -2,7 +2,8 @@ require_relative 'supervisor'
 require_relative 'address'
 require 'socket'
 require 'securerandom'
-module Actor
+
+module Stage
   Data.define
   # ActorSystem is a special supervisor actor
   class ActorSystem

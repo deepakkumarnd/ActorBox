@@ -1,6 +1,6 @@
-require 'actor/mailbox'
+require 'stage/mailbox'
 
-MailBox = Actor::MailBox
+MailBox = Stage::MailBox
 
 def check(name, ok)
   raise "FAIL: #{name}" unless ok

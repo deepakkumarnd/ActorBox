@@ -1,4 +1,4 @@
-module Actor
+module Stage
   module ActorAddress
     Address = Data.define(:actor_id, :system_id, :hostname) do
       def to_s
