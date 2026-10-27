@@ -10,6 +10,30 @@ own thread. A supervisor runs a pool of actors and hands messages to them in
 round-robin order.
 
 
+## Requirements
+
+You need the Spinel compiler installed before you can build or test anything.
+ActorBox is not a gem and does not run as a plain Ruby library: every program
+that uses it must be compiled with Spinel.
+
+Build and install Spinel from source:
+
+```sh
+git clone https://github.com/matz/spinel.git
+cd spinel
+make deps            # fetch libprism (one-time)
+make                 # build the spinel compiler and the spin package tool
+sudo make install    # install spinel and spin into /usr/local/bin
+```
+
+To install somewhere else, use `make install PREFIX=$HOME/.local` and make
+sure that prefix's `bin` directory is on your `PATH`. Check the install with:
+
+```sh
+spinel --help
+spin --help
+```
+
 ## Quick start
 
 Create actors through `SystemActor`, the global actor system. It starts the
@@ -59,7 +83,7 @@ handles a message, `:waiting` while its mailbox is empty, and `:stopped` once
 it dequeues `ControlMessage::STOP`. Messages queued before `STOP` are handled
 first. A stopped actor rejects new messages.
 
-The recommended way to create one is through `SystemActor`, which starts it
+Create one through `SystemActor`, which starts it
 and gives it an address:
 
 ```ruby
@@ -71,49 +95,6 @@ end
 
 3.times { |i| SystemActor.send_message(counter, i) }
 SystemActor.stop
-```
-
-You can also create and drive an actor by hand. You then call `start`
-yourself, keep the object around, and send it `STOP` and `await` it when you
-are done:
-
-```ruby
-require "actor_box"
-
-printer = ActorBox::Actor.new(name: 'printer') do |message|
-  puts "Got #{message}"
-end
-
-printer.state                                      # => :ready
-printer.start
-printer.send_message('hello')                      # => :ok
-printer.send_message(ActorBox::ControlMessage::STOP)  # finish queued work, then stop
-printer.await                                      # wait for the thread to exit
-printer.stopped?                                   # => true
-printer.send_message('too late')                   # => :rejected
-```
-
-Pass `mailbox_size:` to bound the mailbox. A full mailbox rejects messages
-instead of blocking the sender, so check the result:
-
-```ruby
-slow = ActorBox::Actor.new(name: 'slow', mailbox_size: 2) do |message|
-  sleep 1
-end
-slow.start
-
-5.times do |i|
-  if slow.send_message(i) == ActorBox::ControlMessage::REJECTED
-    puts "dropped #{i}"
-  end
-end
-```
-
-`stats` returns a snapshot that is handy for monitoring:
-
-```ruby
-printer.stats
-# => {name: "printer-actor", address: 1234, state: :waiting, message_count: 0}
 ```
 
 Reference:
@@ -137,7 +118,7 @@ share one block. It does no work itself: every message it receives is passed
 to the next child in round-robin order, so up to `concurrency` messages are
 handled in parallel. Stopping a supervisor stops the whole pool.
 
-The recommended way to create one is through `SystemActor`:
+Create one through `SystemActor`:
 
 ```ruby
 require "actor_box"
@@ -150,42 +131,9 @@ end
 SystemActor.stop
 ```
 
-You can also build one by hand. Here each child has a mailbox of 2, so the
-supervisor has to wait when every child is busy:
-
-```ruby
-require "actor_box"
-
-pool = ActorBox::Supervisor.new(name: 'squares', concurrency: 10, mailbox_size: 2) do |message|
-  puts message * message
-end
-
-pool.start                                       # starts all children
-50.times { |i| pool.send_message(i) }
-pool.send_message(ActorBox::ControlMessage::STOP)   # stops every child, then itself
-pool.await
-```
-
-`stats` includes each child's stats, which shows how evenly the work is
-spread:
-
-```ruby
-pool.stats[:actors].map { |child| child[:message_count] }
-# => [2, 2, 1, 2, 2, 2, 2, 1, 2, 2]
-```
-
 `SystemActor.supervisor` registers every child with `SystemActor`, so each
 child has its own address you can message directly, and `SystemActor.stop`
-reaches the children as well as the supervisor. When building a supervisor by
-hand, pass `system:` to get the same behaviour:
-
-```ruby
-pool = ActorBox::Supervisor.new(name: 'workers', concurrency: 3, system: SystemActor) do |message|
-  puts message
-end
-SystemActor.register_actor(pool)
-pool.start
-```
+reaches the children as well as the supervisor.
 
 Reference:
 
@@ -440,48 +388,13 @@ Because `STOP` is just `:stop`, an actor that receives the symbol `:stop` as
 ordinary data will stop. Wrap such values, for example in a hash or a string,
 if your messages can contain it.
 
-## Setup
-
-`bin/` is gitignored. After cloning, link the Spinel tools into it (this
-assumes Spinel is checked out at `../spinel/source_code`):
-
-```sh
-mkdir -p bin
-ln -s ../../spinel/source_code/bin/spin bin/spin
-ln -s ../../spinel/source_code/spinel   bin/spinel
-```
-
-## Project layout
-
-This is a [spin](../spinel/source_code/docs/spin.md) library package. Spin
-resolves `require "actor_box"` to `actor_box.rb` and `require "actor_box/<name>"` to
-`actor_box/<name>.rb`, so there is no `lib/` directory.
-
-```
-actors/
-├── spin.toml               # package manifest
-├── actor_box.rb            # entry point: loads everything, defines SystemActor
-├── actor_box/
-│   ├── actor.rb            # ActorBox::Actor
-│   ├── actor_system.rb     # ActorBox::ActorSystem
-│   ├── address.rb          # ActorBox::ActorAddress
-│   ├── control_message.rb  # ActorBox::ControlMessage
-│   ├── mailbox.rb          # ActorBox::MailBox
-│   └── supervisor.rb       # ActorBox::Supervisor
-├── programs/
-│   ├── fib.rb              # fib(n), used by main.rb
-│   └── cycle.rb            # repro for a Spinel Enumerator#next bug
-├── main.rb                 # example program
-└── test/                   # one standalone test program per file
-```
-
 ## Using the library from another project
 
 Add it as a path dependency:
 
 ```sh
 cd ../myapp
-../actors/bin/spin add actor_box --path ../actors
+spin add actor_box --path ../actors
 ```
 
 Then `require "actor_box"`. Scripts inside this repo, like [main.rb](main.rb), use
@@ -490,7 +403,7 @@ Then `require "actor_box"`. Scripts inside this repo, like [main.rb](main.rb), u
 ## Running the example
 
 ```sh
-bin/spinel main.rb    # compiles to ./main
+spinel main.rb    # compiles to ./main
 ./main
 ```
 
@@ -523,9 +436,9 @@ under both Spinel and CRuby.
 - A non-zero exit fails the test.
 
 ```sh
-bin/spin test                  # run all tests
-bin/spin test mailbox_test.rb  # run one test
-bin/spin test --regen          # refresh .expected snapshots
+spin test                  # run all tests
+spin test mailbox_test.rb  # run one test
+spin test --regen          # refresh .expected snapshots
 ```
 
 Build output goes to `build/`.
@@ -566,12 +479,3 @@ Keep output identical between runs:
 - With several actors, collect results, `await` the actors, then print the
   results sorted.
 - Wait with `await`, not `sleep`.
-
-## Known issues
-
-- [programs/cycle.rb](programs/cycle.rb) reproduces a Spinel bug where calling
-  a user-defined method on the result of `Enumerator#next` raises
-  `NoMethodError` ([matz/spinel#9620](https://github.com/matz/spinel/issues/9620)).
-  The supervisor's round-robin uses the same `Array#cycle` + `next` pattern. It
-  works with the current Spinel build, but suspect this first if supervisor
-  scheduling breaks after a compiler update.
