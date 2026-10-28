@@ -4,19 +4,25 @@ module ActorBox
   class Supervisor < Actor
     # mailbox size is for the concurrent actors not for supervisor
     def initialize(name: nil, concurrency: 1, mailbox_size: nil, system: nil, &block)
+      @system = system
       @concurrency = concurrency
-      @actors = concurrency.times.map do
-        actor = Actor.new(name:, mailbox_size:, &block) 
-        system.register_actor(actor) if system
-        actor
-      end
+      @actors = spawn_child_actors(name:, mailbox_size:, &block)
       @round_robin = @actors.cycle
       set_name(name)
       super()
     end
 
     private def set_name(name)
+      name = "#{object_id}-supervisor" if name.nil? || name.empty?
       @name = name.end_with?('-supervisor') ? name : "#{name}-supervisor"
+    end
+
+    private def spawn_child_actors(name:, mailbox_size:, &block)
+      concurrency.times.map do
+        actor = Actor.new(name:, mailbox_size:, &block)
+        system.register_actor(actor) if @system
+        actor
+      end
     end
 
     def concurrency
