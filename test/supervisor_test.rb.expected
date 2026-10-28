@@ -1,0 +1,6 @@
+ok - creates a new supervisor
+ok - concurrency is 1 by default
+ok - #messages_count returns number of messages in the mailbox
+ok - #state is ready by default
+ok - #stats returns the statistics as a hash
+ok - #send_message send messages to mailbox

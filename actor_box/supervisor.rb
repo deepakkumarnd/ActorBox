@@ -12,6 +12,37 @@ module ActorBox
       super()
     end
 
+    #: () -> Integer
+    def concurrency
+      @concurrency
+    end
+
+    def system
+      @system
+    end
+
+    def start
+      @thread = run
+      @thread.name = name
+    end
+
+    def stats
+      {
+        name:,
+        address:,
+        state:,
+        message_count:,
+        actors: @actors.map(&:stats),
+      }
+    end
+
+    private def sleepmilli(milliseconds)
+      log("Sleeping #{milliseconds/1000.0} seconds")
+      @state = WAITING
+      sleep(milliseconds/1000.0)
+      @state = RUNNING
+    end
+
     private def set_name(name)
       name = "#{object_id}-supervisor" if name.nil? || name.empty?
       @name = name.end_with?('-supervisor') ? name : "#{name}-supervisor"
@@ -23,33 +54,6 @@ module ActorBox
         system.register_actor(actor) if @system
         actor
       end
-    end
-
-    def concurrency
-      @concurrency
-    end
-
-    def start
-      @thread = run
-      @thread.name = name
-    end
-
-    def sleepmilli(milliseconds)
-      log("Sleeping #{milliseconds/1000.0} seconds")
-      @state = WAITING
-      sleep(milliseconds/1000.0)
-      @state = RUNNING
-    end
-
-    def stats
-      {
-        name: name,
-        address: address,
-        state: state,
-        message_count: @mailbox.length,
-        concurrency: concurrency,
-        actors: @actors.map(&:stats)
-      }
     end
 
     private def run
@@ -108,7 +112,7 @@ module ActorBox
     end
 
     private def broadcast(message, attempts = 0)
-      sleepmilli(100 * (2** attempts)) if attempts > 0
+      sleepmilli(100 + (2**attempts)) if attempts > 0
 
       success = @actors
         .filter { !it.stopped? }

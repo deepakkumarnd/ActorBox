@@ -38,7 +38,7 @@ actor = Actor.new(name: 'printer') {}
 check("#ref returns the actor object reference", actor.ref == actor)
 
 actor = Actor.new(name: 'printer') {}
-check("#ref returns the actor object reference", actor.ref == actor)
+check("#messages_count returns number of messages in the mailbox", actor.message_count == 0)
 
 actor = Actor.new(name: 'printer') {}
 check("actor address is the object id by default", actor.address == actor.object_id)
@@ -50,7 +50,7 @@ check("#set_address! set actor address within the actor system", actor.address =
 
 actor = Actor.new(name: 'printer') {}
 3.times { actor.send_message('Hello') }
-check("#send_message send a new message to the actor mailbox", actor.stats[:message_count] == 3)
+check("#send_message send a new message to the actor mailbox", actor.message_count == 3)
 
 actor = Actor.new(name: 'printer') { }
 actor.start
@@ -59,10 +59,10 @@ check("#start will start the actor thread", actor.state == Actor::WAITING)
 
 actor = Actor.new(name: 'printer') { }
 2.times { actor.send_message('Hello') }
-check("#start will process the messages send to the actor", actor.stats[:message_count] == 2)
+check("#start will process the messages send to the actor", actor.message_count == 2)
 actor.start
 sleep 0.05
-check("#start will process the messages send to the actor", actor.stats[:message_count] == 0)
+check("#start will process the messages send to the actor", actor.message_count == 0)
 
 actor = Actor.new(name: 'printer') { }
 actor.start

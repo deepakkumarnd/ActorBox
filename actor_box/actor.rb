@@ -24,6 +24,10 @@ module ActorBox
       @name
     end
 
+    def message_count
+      @mailbox.size
+    end
+
     # used by SystemActor to set the address
     #: (Address) -> void
     def set_address!(address)
@@ -45,16 +49,17 @@ module ActorBox
       @address || object_id
     end
 
+    #: () -> Symbol
     def state
       @state
     end
 
     def stats
       {
-        name: name,
-        address: address,
-        state: state,
-        message_count: @mailbox.length
+        name:,
+        address:,
+        state:,
+        message_count:
       }
     end
 
