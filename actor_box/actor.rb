@@ -59,6 +59,7 @@ module ActorBox
     end
 
     def start
+      return unless ready?
       # pass the @block to use high performance yield instead of @block.yield
       @thread = run(&@block)
       @thread.name = name
@@ -70,6 +71,10 @@ module ActorBox
 
     def await
       @thread.join
+    end
+
+    def ready?
+      @state == READY
     end
 
     def stopped?
