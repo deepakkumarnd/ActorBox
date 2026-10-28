@@ -44,3 +44,9 @@ sleep 0.05
 waiting = reader.alive?
 mailbox.enqueue(:late)
 check("blocks dequeue until a message arrives", waiting && reader.value == :late)
+
+mailbox = MailBox.new
+mailbox.enqueue(:message)
+mailbox.clear
+sleep 0.05
+check("Clears the messages from the mailbox", mailbox.size == 0)

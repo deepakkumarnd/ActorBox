@@ -6,3 +6,4 @@ ok - dequeues messages in FIFO order
 ok - accepts control messages
 ok - rejects messages once full
 ok - blocks dequeue until a message arrives
+ok - Clears the messages from the mailbox

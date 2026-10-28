@@ -70,7 +70,7 @@ module ActorBox
     end
 
     def await
-      @thread.join
+      @thread&.join
     end
 
     def ready?
@@ -82,8 +82,8 @@ module ActorBox
     end
 
     def cleanup
-      @mailbox = []
-      @thread = nil
+      return if @thread&.alive?
+      @mailbox.clear
       @state = STOPPED
     end
 

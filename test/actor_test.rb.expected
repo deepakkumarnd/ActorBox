@@ -10,3 +10,9 @@ ok - actor address is the object id by default
 ok - #set_address! set actor address within the actor system
 ok - #send_message send a new message to the actor mailbox
 ok - #start will start the actor thread
+ok - #start will process the messages send to the actor
+ok - #start will process the messages send to the actor
+ok - an actor can be stopped by sending ControlMessage::STOP
+ok - A stopped actor does not accept any new messages
+ok - A stopped actor cannot be restarted
+ok - #cleanup actor will empty the mailbox

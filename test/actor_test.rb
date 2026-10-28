@@ -54,27 +54,27 @@ check("#send_message send a new message to the actor mailbox", actor.stats[:mess
 
 actor = Actor.new(name: 'printer') { }
 actor.start
-sleep 0.1
+sleep 0.05
 check("#start will start the actor thread", actor.state == Actor::WAITING)
 
 actor = Actor.new(name: 'printer') { }
 2.times { actor.send_message('Hello') }
 check("#start will process the messages send to the actor", actor.stats[:message_count] == 2)
 actor.start
-sleep 0.1
+sleep 0.05
 check("#start will process the messages send to the actor", actor.stats[:message_count] == 0)
 
 actor = Actor.new(name: 'printer') { }
 actor.start
 actor.send_message(ActorBox::ControlMessage::STOP)
-sleep 0.1
+sleep 0.05
 check("an actor can be stopped by sending ControlMessage::STOP", actor.state == ActorBox::Actor::STOPPED)
 
 
 actor = Actor.new(name: 'printer') { }
 actor.start
 actor.send_message(ActorBox::ControlMessage::STOP)
-sleep 0.1
+sleep 0.05
 response = actor.send_message('Hello')
 check("A stopped actor does not accept any new messages", response == ActorBox::ControlMessage::REJECTED)
 
@@ -82,6 +82,11 @@ check("A stopped actor does not accept any new messages", response == ActorBox::
 actor = Actor.new(name: 'printer') { }
 actor.start
 actor.send_message(ActorBox::ControlMessage::STOP)
-sleep 0.1
+sleep 0.05
 actor.start
 check("A stopped actor cannot be restarted", actor.state == ActorBox::Actor::STOPPED)
+
+actor = Actor.new(name: 'printer') { }
+actor.send_message("Hello")
+actor.cleanup
+check("#cleanup actor will empty the mailbox", actor.stats[:message_count] == 0)

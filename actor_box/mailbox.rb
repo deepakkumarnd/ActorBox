@@ -22,7 +22,7 @@ module ActorBox
         queue.push(item)
         ControlMessage::OK
       # Reject if queue is full with zero timeout
-      elsif (queue.size < max_size) && queue.push(item, timeout: 0)
+      elsif queue.push(item, timeout: 0)
         ControlMessage::OK 
       else
         warn('Message rejected queue full')
@@ -44,6 +44,10 @@ module ActorBox
 
     def unbounded?
       @max_size.nil?
+    end
+
+    def clear
+      @queue.clear
     end
 
     alias_method :count, :length
